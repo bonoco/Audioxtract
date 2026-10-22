@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "AudioXtract"
 include(":app")
+include(":whisper")
+project(":whisper").projectDir = file("whisper.cpp/examples/whisper.android/lib")

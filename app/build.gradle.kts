@@ -9,7 +9,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.breno.audioxtract"
+        applicationId = "com.bonoco.audioxtract"
         minSdk = 29
         targetSdk = 35
         versionCode = 1
@@ -38,4 +38,7 @@ dependencies {
     // FFmpeg (fork mantido do ffmpeg-kit) - variante "audio": MP3, Opus, Vorbis, AAC, FLAC, WAV
     implementation("dev.ffmpegkit-maintained:ffmpeg-kit-audio:6.0.3")
     implementation("com.arthenica:smart-exception-java:0.2.1")
+
+    // Whisper.cpp (reconhecimento de fala / transcrição para legendas)
+    implementation(project(":whisper"))
 }
