@@ -1,33 +1,29 @@
 # AudioXtract
 
-Aplicativo para extração e conversão de áudio em vários formatos como MP3, M4A (AAC), OPUS, OGG, WAV e FLAC.
+Aplicativo Android para extrair o áudio de vídeos, rápido e 100% offline. By Bonoco.
 
-## Recursos
+## Funções
+- Extrai o áudio de arquivos de vídeo
+- Formatos de saída: MP3, M4A (AAC), OPUS, OGG, WAV e FLAC
+- Processamento no próprio aparelho, sem enviar nada pra internet
 
-- Extrai o áudio de vídeos direto no celular
-- Suporte a múltiplos formatos (MP3, M4A, OPUS, OGG, WAV, FLAC)
-- Interface moderna (Material Design 3)
-- Funciona 100% offline
+## Instalação
+1. Vai em [Releases](../../releases) e baixa o `.apk` mais recente
+2. Abre o arquivo no celular e permite a instalação de fontes desconhecidas
+3. Pronto
 
-## Como compilar
+## Compilar do código
+1. Clona o repositório
+2. Abre no Android Studio
+3. Roda o Gradle sync e clica em **Run**
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/bonoco/Audioxtract.git
-   ```
-2. Abra a pasta no **Android Studio**.
-3. Aguarde o Gradle sincronizar e clique em **Run**.
+## Licença e créditos
+Este projeto está sob a licença [MIT](LICENSE).
 
-## Tecnologias
+### Bibliotecas de terceiros
+- **FFmpeg / FFmpegKit (variante `ffmpeg-kit-audio`)**: LGPL-3.0.
+  https://github.com/ffmpegkit-maintained/ffmpeg
+- **AndroidX e Jetpack Compose**: Apache License 2.0.
+- O FFmpeg é uma marca de seus respectivos mantenedores. Este projeto não é afiliado a eles.
 
-- Kotlin
-- Jetpack Compose / Material Design 3
-- FFmpegKit
-
-## Licença
-
-Distribuído sob a licença GNU GPL v3.0. Veja o arquivo `LICENSE`.
-
-## Autor
-
-Feito por Breno.
+Feito por Bonoco.
