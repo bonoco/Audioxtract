@@ -27,5 +27,5 @@ keystore.properties
 .DS_Store
 Thumbs.db
 
-# Submódulo / pasta externa do Whisper C++
-whisper.cpp/
+# Modelos de legenda (baixados pelo app)
+*.bin
