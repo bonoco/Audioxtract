@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -217,19 +218,36 @@ fun Screen(vm: AudioViewModel = viewModel()) {
                 )
             }
 
+            Button(
+                onClick = { vm.transcribe() },
+                enabled = vm.uri != null && !vm.running,
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.filledTonalButtonColors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+            ) {
+                Text("Gerar legenda (.srt)", style = MaterialTheme.typography.titleMedium)
+            }
+
             if (vm.running) {
-                LinearProgressIndicator(
-                    progress = { vm.progress },
-                    strokeCap = StrokeCap.Round,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                )
-                Text(
-                    "${(vm.progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (vm.progress > 0f) {
+                    LinearProgressIndicator(
+                        progress = { vm.progress },
+                        strokeCap = StrokeCap.Round,
+                        modifier = Modifier.fillMaxWidth().height(10.dp)
+                    )
+                    Text(
+                        "${(vm.progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    LinearProgressIndicator(
+                        strokeCap = StrokeCap.Round,
+                        modifier = Modifier.fillMaxWidth().height(10.dp)
+                    )
+                }
             }
 
             vm.message?.let { msg ->
