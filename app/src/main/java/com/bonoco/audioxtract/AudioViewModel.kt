@@ -20,7 +20,10 @@ import com.arthenica.ffmpegkit.ReturnCode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.whispercpp.whisper.WhisperContext
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 
 /** Formatos de saída. */
 enum class AudioFormat(
@@ -188,6 +191,94 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 tempOutputFile?.delete()
                 FFmpegKitConfig.enableStatisticsCallback(null)
+            }
+        }
+    }
+
+    fun transcribe() {
+        val videoFile = localVideoFile ?: return
+        if (!videoFile.exists()) {
+            message = "Selecione o vídeo novamente."
+            isError = true
+            return
+        }
+        if (running) return
+
+        val ctx = getApplication<Application>()
+        running = true
+        progress = 0f
+        message = "Preparando áudio..."
+        isError = false
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val pcm = File(ctx.cacheDir, "whisper_input.pcm")
+            var whisper: WhisperContext? = null
+            try {
+                pcm.delete()
+                val session = FFmpegKit.executeWithArguments(
+                    arrayOf("-y", "-i", videoFile.absolutePath, "-vn",
+                        "-ac", "1", "-ar", "16000", "-f", "s16le", pcm.absolutePath)
+                )
+                if (!ReturnCode.isSuccess(session.returnCode) || !pcm.exists() || pcm.length() == 0L) {
+                    throw IllegalStateException("Não foi possível extrair o áudio. Verifique se o vídeo possui som.")
+                }
+
+                val shorts = ByteBuffer.wrap(pcm.readBytes())
+                    .order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+                val samples = FloatArray(shorts.remaining()) { shorts.get(it) / 32768f }
+                pcm.delete()
+
+                withContext(Dispatchers.Main) {
+                    message = "Transcrevendo... pode levar alguns minutos"
+                }
+                val w = WhisperContext.createContextFromAsset(ctx.assets, "models/ggml-base.bin")
+                whisper = w
+                val raw = w.transcribeData(samples, printTimestamp = true)
+                val srt = toSrt(raw)
+                if (srt.isBlank()) throw IllegalStateException("O Whisper não retornou texto.")
+                android.util.Log.d("AudioXtract", "SRT:\n$srt")
+
+                val baseName = (fileName ?: "legenda").substringBeforeLast('.').ifEmpty { "legenda" }
+                val tempSrt = File(ctx.cacheDir, "legenda_${System.currentTimeMillis()}.srt")
+                tempSrt.writeText(srt)
+                saveToMediaStore(
+                    uri = MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    relativePath = "Download/AudioXtract",
+                    file = tempSrt,
+                    name = "$baseName.srt",
+                    mime = "application/x-subrip"
+                )
+                tempSrt.delete()
+
+                withContext(Dispatchers.Main) {
+                    message = "Pronto! Legenda salva em: Downloads / AudioXtract / $baseName.srt"
+                    isError = false
+                    running = false
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("AudioXtract", "Whisper falhou", e)
+                withContext(Dispatchers.Main) {
+                    message = e.localizedMessage ?: "Erro ao gerar legenda."
+                    isError = true
+                    running = false
+                }
+            } finally {
+                pcm.delete()
+                whisper?.release()
+            }
+        }
+    }
+
+    private fun toSrt(raw: String): String {
+        val regex = Regex("""\[(\d{2}:\d{2}:\d{2})\.(\d{3}) --> (\d{2}:\d{2}:\d{2})\.(\d{3})\]:\s*(.*)""")
+        var n = 0
+        return buildString {
+            raw.lines().forEach { line ->
+                val m = regex.matchEntire(line.trim()) ?: return@forEach
+                val (s, sms, e, ems, text) = m.destructured
+                if (text.isBlank()) return@forEach
+                n++
+                append("$n\n$s,$sms --> $e,$ems\n${text.trim()}\n\n")
             }
         }
     }
