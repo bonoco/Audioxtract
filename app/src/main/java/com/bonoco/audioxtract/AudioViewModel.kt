@@ -233,8 +233,19 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 val w = WhisperContext.createContextFromAsset(ctx.assets, "models/ggml-base.bin")
                 whisper = w
-                val raw = w.transcribeData(samples, printTimestamp = true)
-                val srt = toSrt(raw)
+                val allWords = mutableListOf<Triple<Double, Double, String>>()
+                val chunk = 30 * 16000
+                var start = 0
+                while (start < samples.size) {
+                    var end = minOf(start + chunk, samples.size)
+                    if (end < samples.size) end = quietPoint(samples, end - 3 * 16000, end)
+                    val raw = w.transcribeData(samples.copyOfRange(start, end), printTimestamp = true)
+                    allWords += parseWords(raw, start / 16000.0)
+                    start = end
+                    val p = start.toFloat() / samples.size
+                    withContext(Dispatchers.Main) { progress = p }
+                }
+                val srt = toSrt(allWords)
                 if (srt.isBlank()) throw IllegalStateException("O Whisper não retornou texto.")
                 android.util.Log.d("AudioXtract", "SRT:\n$srt")
 
@@ -269,18 +280,58 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun toSrt(raw: String): String {
-        val regex = Regex("""\[(\d{2}:\d{2}:\d{2})\.(\d{3}) --> (\d{2}:\d{2}:\d{2})\.(\d{3})\]:\s*(.*)""")
-        var n = 0
+    private data class Cue(val start: Double, val end: Double, val text: String)
+
+    private fun buildCues(words: List<Triple<Double, Double, String>>): List<Cue> {
+        return words.map { Cue(it.first, it.second, it.third) }
+    }
+
+    private fun srtTime(seconds: Double): String {
+        val ms = (seconds * 1000).toLong().coerceAtLeast(0)
+        val hr = ms / (3600 * 1000)
+        val remHr = ms % (3600 * 1000)
+        val min = remHr / (60 * 1000)
+        val remMin = remHr % (60 * 1000)
+        val sec = remMin / 1000
+        val remSec = remMin % 1000
+        return String.format(java.util.Locale.US, "%02d:%02d:%02d,%03d", hr, min, sec, remSec)
+    }
+
+    private fun parseWords(raw: String, offset: Double): List<Triple<Double, Double, String>> {
+        val rx = Regex("""\[(\d{2}):(\d{2}):(\d{2})\.(\d{3}) --> (\d{2}):(\d{2}):(\d{2})\.(\d{3})\]:\s*(.*)""")
+        val words = mutableListOf<Triple<Double, Double, String>>()
+        raw.lines().forEach { line ->
+            val g = rx.matchEntire(line.trim())?.groupValues ?: return@forEach
+            val a = g[1].toInt() * 3600 + g[2].toInt() * 60 + g[3].toInt() + g[4].toInt() / 1000.0
+            val b = g[5].toInt() * 3600 + g[6].toInt() * 60 + g[7].toInt() + g[8].toInt() / 1000.0
+            val t = g[9].trim()
+            if (t.isEmpty() || (t.startsWith("[") && t.endsWith("]"))) return@forEach
+            words.add(Triple(a + offset, b + offset, t))
+        }
+        return words
+    }
+
+    private fun toSrt(words: List<Triple<Double, Double, String>>): String {
+        val cues = buildCues(words)
         return buildString {
-            raw.lines().forEach { line ->
-                val m = regex.matchEntire(line.trim()) ?: return@forEach
-                val (s, sms, e, ems, text) = m.destructured
-                if (text.isBlank()) return@forEach
-                n++
-                append("$n\n$s,$sms --> $e,$ems\n${text.trim()}\n\n")
+            cues.forEachIndexed { i, c ->
+                append("${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n\n")
             }
         }
+    }
+
+    private fun quietPoint(s: FloatArray, from: Int, to: Int): Int {
+        val win = 1600 // 100 ms
+        var best = to
+        var bestE = Float.MAX_VALUE
+        var i = maxOf(from, 0)
+        while (i + win <= to) {
+            var e = 0f
+            for (j in i until i + win) e += s[j] * s[j]
+            if (e < bestE) { bestE = e; best = i + win / 2 }
+            i += win
+        }
+        return best
     }
 
     private fun saveToPublicStorage(file: File, name: String, fmt: AudioFormat): String {
