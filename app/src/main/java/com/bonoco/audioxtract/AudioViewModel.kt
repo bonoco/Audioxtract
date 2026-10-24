@@ -195,6 +195,8 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private class Cue(var start: Double, var end: Double, var text: String)
+
     fun transcribe() {
         val videoFile = localVideoFile ?: return
         if (!videoFile.exists()) {
@@ -229,10 +231,13 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
                 pcm.delete()
 
                 withContext(Dispatchers.Main) {
+                    progress = 0.05f
                     message = "Transcrevendo... pode levar alguns minutos"
                 }
                 val w = WhisperContext.createContextFromAsset(ctx.assets, "models/ggml-base.bin")
                 whisper = w
+
+                // Blocos de 30 s: o progresso sobe a cada bloco (5% -> 98%)
                 val allWords = mutableListOf<Triple<Double, Double, String>>()
                 val chunk = 30 * 16000
                 var start = 0
@@ -242,12 +247,12 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
                     val raw = w.transcribeData(samples.copyOfRange(start, end), printTimestamp = true)
                     allWords += parseWords(raw, start / 16000.0)
                     start = end
-                    val p = start.toFloat() / samples.size
+                    val p = 0.05f + 0.93f * (start.toFloat() / samples.size)
                     withContext(Dispatchers.Main) { progress = p }
                 }
+
                 val srt = toSrt(allWords)
                 if (srt.isBlank()) throw IllegalStateException("O Whisper não retornou texto.")
-                android.util.Log.d("AudioXtract", "SRT:\n$srt")
 
                 val baseName = (fileName ?: "legenda").substringBeforeLast('.').ifEmpty { "legenda" }
                 val tempSrt = File(ctx.cacheDir, "legenda_${System.currentTimeMillis()}.srt")
@@ -262,6 +267,7 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
                 tempSrt.delete()
 
                 withContext(Dispatchers.Main) {
+                    progress = 1f
                     message = "Pronto! Legenda salva em: Downloads / AudioXtract / $baseName.srt"
                     isError = false
                     running = false
@@ -278,23 +284,6 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
                 whisper?.release()
             }
         }
-    }
-
-    private data class Cue(val start: Double, val end: Double, val text: String)
-
-    private fun buildCues(words: List<Triple<Double, Double, String>>): List<Cue> {
-        return words.map { Cue(it.first, it.second, it.third) }
-    }
-
-    private fun srtTime(seconds: Double): String {
-        val ms = (seconds * 1000).toLong().coerceAtLeast(0)
-        val hr = ms / (3600 * 1000)
-        val remHr = ms % (3600 * 1000)
-        val min = remHr / (60 * 1000)
-        val remMin = remHr % (60 * 1000)
-        val sec = remMin / 1000
-        val remSec = remMin % 1000
-        return String.format(java.util.Locale.US, "%02d:%02d:%02d,%03d", hr, min, sec, remSec)
     }
 
     private fun parseWords(raw: String, offset: Double): List<Triple<Double, Double, String>> {
@@ -320,8 +309,47 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private fun buildCues(
+        words: List<Triple<Double, Double, String>>,
+        maxWords: Int = 5, maxDur: Double = 2.8, maxGap: Double = 0.8
+    ): List<Cue> {
+        val cues = mutableListOf<Cue>()
+        val cur = mutableListOf<Triple<Double, Double, String>>()
+        fun flush() {
+            if (cur.isNotEmpty()) {
+                val text = cur.joinToString(" ") { it.third }.trim()
+                if (text.isNotEmpty()) cues.add(Cue(cur.first().first, cur.last().second, text))
+                cur.clear()
+            }
+        }
+        for (w in words) {
+            if (cur.isNotEmpty() && (cur.size >= maxWords ||
+                        w.second - cur.first().first > maxDur ||
+                        w.first - cur.last().second > maxGap)) flush()
+            cur.add(w)
+            if ((w.third.endsWith(".") || w.third.endsWith("?") || w.third.endsWith("!")) && cur.size >= 3) flush()
+        }
+        flush()
+        for (i in cues.indices) {
+            val c = cues[i]
+            c.end = maxOf(c.end, c.start + 0.3)
+            if (i + 1 < cues.size && c.end > cues[i + 1].start)
+                c.end = maxOf(cues[i + 1].start, c.start + 0.1)
+        }
+        return cues
+    }
+
+    private fun srtTime(sec: Double): String {
+        var ms = Math.round(maxOf(sec, 0.0) * 1000)
+        val h = ms / 3600000; ms %= 3600000
+        val m = ms / 60000; ms %= 60000
+        val s = ms / 1000; ms %= 1000
+        return String.format(java.util.Locale.US, "%02d:%02d:%02d,%03d", h, m, s, ms)
+    }
+
+    // Acha o ponto mais silencioso (janelas de 100 ms) pra cortar o bloco sem partir palavra
     private fun quietPoint(s: FloatArray, from: Int, to: Int): Int {
-        val win = 1600 // 100 ms
+        val win = 1600
         var best = to
         var bestE = Float.MAX_VALUE
         var i = maxOf(from, 0)

@@ -24,6 +24,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -101,7 +102,7 @@ fun Screen(vm: AudioViewModel = viewModel()) {
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                "Tire o áudio de qualquer vídeo",
+                "Extraia áudio e legendas de qualquer vídeo",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -160,6 +161,10 @@ fun Screen(vm: AudioViewModel = viewModel()) {
                                 onClick = { vm.format = f },
                                 enabled = !vm.running,
                                 shape = RoundedCornerShape(50),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                ),
                                 label = { Text(f.label) }
                             )
                         }
@@ -190,6 +195,10 @@ fun Screen(vm: AudioViewModel = viewModel()) {
                                     onClick = { vm.bitrate = b },
                                     enabled = !vm.running,
                                     shape = RoundedCornerShape(50),
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary
+                                    ),
                                     label = { Text("$b kbps") }
                                 )
                             }
@@ -231,23 +240,16 @@ fun Screen(vm: AudioViewModel = viewModel()) {
             }
 
             if (vm.running) {
-                if (vm.progress > 0f) {
-                    LinearProgressIndicator(
-                        progress = { vm.progress },
-                        strokeCap = StrokeCap.Round,
-                        modifier = Modifier.fillMaxWidth().height(10.dp)
-                    )
-                    Text(
-                        "${(vm.progress * 100).toInt()}%",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                } else {
-                    LinearProgressIndicator(
-                        strokeCap = StrokeCap.Round,
-                        modifier = Modifier.fillMaxWidth().height(10.dp)
-                    )
-                }
+                LinearProgressIndicator(
+                    progress = { vm.progress },
+                    strokeCap = StrokeCap.Round,
+                    modifier = Modifier.fillMaxWidth().height(10.dp)
+                )
+                Text(
+                    "${(vm.progress * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
 
             vm.message?.let { msg ->
