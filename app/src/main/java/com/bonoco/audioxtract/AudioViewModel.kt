@@ -287,7 +287,7 @@ class AudioViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun parseWords(raw: String, offset: Double): List<Triple<Double, Double, String>> {
-        val rx = Regex("""\[(\d{2}):(\d{2}):(\d{2})\.(\d{3}) --> (\d{2}):(\d{2}):(\d{2})\.(\d{3})\]:\s*(.*)""")
+        val rx = Regex("""\[(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[\.,](\d{3})\]:?\s*(.*)""")
         val words = mutableListOf<Triple<Double, Double, String>>()
         raw.lines().forEach { line ->
             val g = rx.matchEntire(line.trim())?.groupValues ?: return@forEach

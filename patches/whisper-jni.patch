@@ -1,5 +1,5 @@
 diff --git a/examples/whisper.android/lib/src/main/jni/whisper/jni.c b/examples/whisper.android/lib/src/main/jni/whisper/jni.c
-index da54c81..a52792a 100644
+index da54c81..630a7d0 100644
 --- a/examples/whisper.android/lib/src/main/jni/whisper/jni.c
 +++ b/examples/whisper.android/lib/src/main/jni/whisper/jni.c
 @@ -176,7 +176,11 @@ Java_com_whispercpp_whisper_WhisperLib_00024Companion_fullTranscribe(
@@ -9,7 +9,7 @@ index da54c81..a52792a 100644
 -    params.language = "en";
 +    params.language = "pt";
 +    params.token_timestamps = true;
-+    params.max_len = 1;
++    params.max_len = 0;
 +    params.split_on_word = true;
 +    params.initial_prompt = "Brevent, ADB, depuração sem fio, Android";
      params.n_threads = num_threads;
